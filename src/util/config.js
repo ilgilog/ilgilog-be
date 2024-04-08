@@ -30,8 +30,20 @@ const config = {
         },
 
         schema: {
-            COMMON: process.env.DB_SCHEMA,
+            COMMON: process.env.DB_NAME,
         },
+    },
+
+    jwt: {
+        accessExp: process.env.ACCESS,
+        refreshExp: process.env.REFRESH,
+        secret: process.env.SECRET,
+    },
+
+    kakao: {
+        client_id: process.env.KAKAO_REST_API,
+        redirect_url: process.env.KAKAO_REDIRECT_URL,
+        client_secret: process.env.KAKAO_CLIENT_SECRET,
     },
 };
 

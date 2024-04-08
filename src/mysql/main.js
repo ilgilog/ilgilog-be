@@ -49,7 +49,7 @@ mysql.init = async function () {
 mysql.testConnection = function () {
     return new Promise(async (resolve, reject) => {
         try {
-            let result = await this.query(`SELECT 1;`, [], { silent: false });
+            let result = await this.query(`SELECT 1;`, [], { silent: true });
             if (result.success) {
                 this.createBeatInterval();
                 log.info(`MySQL - Connection check: OK!`);
@@ -63,7 +63,7 @@ mysql.testConnection = function () {
 };
 
 mysql.createBeatInterval = async function () {
-    let res = await this.query(`SHOW SESSION VARIABLES LIKE 'wait_timeout'`, null, { silent: false });
+    let res = await this.query(`SHOW SESSION VARIABLES LIKE 'wait_timeout'`, null, { silent: true });
     if (!res.success || res.rows.length === 0) {
         log.warn(`MySQL - WARN: Heartbear check failed (reason: FAIL: DB)`);
         return;
@@ -89,7 +89,7 @@ mysql._runBeatPacket = async function () {
     if (this._runningBeat) return;
     this._runningBeat = true;
 
-    await this.query(`SELECT 1;`, null, { silent: false });
+    await this.query(`SELECT 1;`, null, { silent: true });
 
     this._runningBeat = false;
 };

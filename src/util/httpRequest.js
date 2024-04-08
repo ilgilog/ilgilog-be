@@ -23,8 +23,8 @@ const axiosObj = axios.create({
 httpRequest.METHOD = {
     GET: 0,
     POST: 1,
-    // PUT: 2,
-    // DELETE: 3,
+    PUT: 2,
+    DELETE: 3,
 };
 
 /**
@@ -47,6 +47,14 @@ httpRequest.request = async function (method, url, data, options = {}) {
             });
         } else if (method === this.METHOD.POST) {
             res = await axiosObj.post(url, data, {
+                ...options,
+            });
+        } else if (method === this.METHOD.PUT) {
+            res = await axiosObj.put(url, data, {
+                ...options,
+            });
+        } else if (method === this.METHOD.DELETE) {
+            res = await axiosObj.delete(url, data, {
                 ...options,
             });
         }

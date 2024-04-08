@@ -8,7 +8,10 @@ const express = { _server: null, _init: false };
 
 const engine = require("express");
 const { util, log, config } = require("../util");
+const errorCode = require("./errorCode");
+const validationHandler = require("./validationHandler");
 
+const authRouter = require("./router/auth");
 const testRouter = require("./router/test");
 
 express.init = function () {
@@ -65,8 +68,11 @@ express.init = function () {
                 next();
             });
 
+            webServer.use(express.validateTimestamp);
+            webServer.use(validationHandler.handle);
             webServer.use(require("request-ip").mw({ attributeName: "ipAddress" }));
 
+            webServer.use("/auth", authRouter);
             webServer.use("/test", testRouter);
 
             let routers = engine.Router();
@@ -127,4 +133,19 @@ express._printFailLog = function (req, res, dataTable) {
     log.warn(`Express - ${req.ipAddress} -> ${req.protocol.toUpperCase() ?? "unknown"}/${req.httpVersion} ${req.method.toUpperCase()} ${req.originalUrl} > ${res.statusCode} Fail (code: ${dataTable.code}, message: ${dataTable.message})`);
 };
 
+express.validateTimestamp = function (req, res, next) {
+    let timestamp = Number(req.method === "GET" ? req.query.timestamp : req.body.timestamp);
+
+    if (!timestamp || !Number.isInteger(timestamp)) {
+        res.failResponse("ParameterInvalid");
+        return;
+    }
+
+    if (Math.abs(timestamp - util.getCurrentTimestamp()) > 10) {
+        res.failResponse("TimestampInvalid");
+        return;
+    }
+
+    next();
+};
 module.exports = express;

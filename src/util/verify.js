@@ -8,6 +8,11 @@ const jwt = require("jsonwebtoken");
 const config = require("../util/config");
 
 const jwtVerify = (req, res, next) => {
+    if (!req || !req.headers) {
+        res.failResponse("AuthorizationNull");
+        return;
+    }
+
     let authHeader = req.headers["authorization"];
 
     if (!authHeader) {

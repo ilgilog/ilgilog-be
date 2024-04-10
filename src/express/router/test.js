@@ -9,10 +9,13 @@ const router = express.Router();
 const mysql = require("../../mysql/main");
 const { matchedData, validationResult, body, query } = require("express-validator");
 const config = require("../../util/config");
+const validationHandler = require("../validationHandler");
 
 const schema = config.database.schema.COMMON;
 
-router.get("/name", async (req, res) => {
+const testValidator = [query("uid").notEmpty().isInt(), validationHandler.handle];
+
+router.get("/name", testValidator, async (req, res) => {
     let result = await mysql.query(`SELECT * FROM ${schema}.test;`);
 
     if (!result.success) {

@@ -9,9 +9,8 @@ const express = { _server: null, _init: false };
 const engine = require("express");
 const { util, log, config } = require("../util");
 const errorCode = require("./errorCode");
-const validationHandler = require("./validationHandler");
 
-const authRouter = require("./router/auth");
+const userRouter = require("./router/user");
 const testRouter = require("./router/test");
 
 express.init = function () {
@@ -69,11 +68,10 @@ express.init = function () {
             });
 
             webServer.use(express.validateTimestamp);
-            webServer.use(validationHandler.handle);
             webServer.use(require("request-ip").mw({ attributeName: "ipAddress" }));
 
-            webServer.use("/auth", authRouter);
-            webServer.use("/test", testRouter);
+            webServer.use("/api/user", userRouter);
+            webServer.use("/api/test", testRouter);
 
             let routers = engine.Router();
 

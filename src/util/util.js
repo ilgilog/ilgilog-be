@@ -75,9 +75,18 @@ util.createToken = function (userInfo) {
             { expiresIn: config.jwt.refreshExp },
         );
 
-        token.access_token = access_token;
-        token.refresh_token = refresh_token;
+        token.accessToken = access_token;
+        token.refreshToken = refresh_token;
 
+        return token;
+    } catch (exception) {
+        return null;
+    }
+};
+
+util.extractionToken = function (authorization) {
+    try {
+        let token = authorization.split(" ")[1];
         return token;
     } catch (exception) {
         return null;

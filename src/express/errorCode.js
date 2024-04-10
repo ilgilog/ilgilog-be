@@ -20,6 +20,8 @@ errorCode.errors = {
 
     NotFound: { code: 2000, message: "Not Found" },
     ServerError: { code: 2001, message: "Server error" },
+
+    QueryError: { code: 3000, message: "Query error" },
 };
 
 errorCode.get = function (errorCode) {

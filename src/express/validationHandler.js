@@ -33,7 +33,7 @@ if (process.env.NODE_ENV === "production") {
         }
 
         if (!result.isEmpty()) {
-            log.debug(result.array());
+            // log.debug(result.array());
 
             res.failResponse("ParameterInvalid");
             return;

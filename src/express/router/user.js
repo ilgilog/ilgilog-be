@@ -16,20 +16,18 @@ const schema = config.database.schema.COMMON;
 
 router.post("/login", async (req, res) => {
     try {
-        // const code = req.query.code;
+        const code = req.query.code;
 
-        // const kakaoToken = await axios.post("https://kauth.kakao.com/oauth/token", null, {
-        //     params: {
-        //         grant_type: "authorization_code",
-        //         client_id: config.kakao.client_id,
-        //         redirect_url: config.kakao.redirect_url,
-        //         code: code,
-        //         client_secret: config.kakao.client_secret,
-        //     },
-        // });
-        // const kakao_token = kakaoToken.data.access_token;
-
-        let kakao_token = req.headers.authorization;
+        const kakaoToken = await axios.post("https://kauth.kakao.com/oauth/token", null, {
+            params: {
+                grant_type: "authorization_code",
+                client_id: config.kakao.client_id,
+                redirect_url: config.kakao.redirect_url,
+                code: code,
+                client_secret: config.kakao.client_secret,
+            },
+        });
+        const kakao_token = kakaoToken.data.access_token;
 
         if (!kakao_token) {
             res.failResponse("ParameterInvalid");

@@ -7,14 +7,11 @@
 const express = require("express");
 const router = express.Router();
 const mysql = require("../../mysql/main");
-const { matchedData, validationResult, body, query } = require("express-validator");
-const util = require("../../util/util");
-const log = require("../../util/log");
-const config = require("../../util/config");
-const axios = require("axios");
-const validationHandler = require("../validationHandler");
+const { util, log, config } = require("../../util");
 const jwtVerify = require("../../util/verify");
-
+const { matchedData, validationResult, body, query } = require("express-validator");
+const validationHandler = require("../validationHandler");
+const axios = require("axios");
 const schema = config.database.schema.COMMON;
 
 router.post("/login", async (req, res) => {
@@ -52,7 +49,6 @@ router.post("/login", async (req, res) => {
             nickName: userData.data.kakao_account.profile.nickname,
         };
 
-        //db 기존 회원 조회 후 토큰 발행하고 넘겨주는 로직 작성해야함.
         let checkUser = await mysql.query(`SELECT id, email FROM ${schema}.user WHERE email = ?;`, [userInfo.email]);
 
         if (!checkUser.success) {
@@ -69,6 +65,13 @@ router.post("/login", async (req, res) => {
             let joinUser = await mysql.execute(joinQuery, joinQueryParams);
 
             if (!joinUser.success) {
+                res.failResponse("QueryError");
+                return;
+            }
+
+            let newPoint = await mysql.execute(`INSERT INTO ${schema}.stat (uid, earned) VALUES (?, ?);`, [joinUser.insertId, 200]);
+
+            if (!newPoint.success) {
                 res.failResponse("QueryError");
                 return;
             }
@@ -94,7 +97,7 @@ router.post("/login", async (req, res) => {
                 uid: joinUser.insertId,
                 email: userInfo.email,
                 nickName: userInfo.nickName,
-                firstLogin: 1,
+                firstLogin: 0,
                 accessToken: token.access_token,
                 refreshToken: token.refresh_token,
             };
@@ -112,18 +115,32 @@ router.post("/login", async (req, res) => {
                 return;
             }
 
+            if (user.rows.first_login === 1) {
+                let secondLogin = await mysql.execute(`UPDATE ${schema}.user SET first_login = 0 WHERE id = ?;`, [user.rows.id]);
+
+                if (!secondLogin.success) {
+                    res.failResponse("QueryError");
+                    return;
+                }
+
+                if (secondLogin.affectedRows === 0) {
+                    res.failResponse("AffectedEmpty");
+                    return;
+                }
+            }
+
             let tokenData = {
-                id: user.rows[0].id,
-                email: user.rows[0].email,
+                id: user.rows.id,
+                email: user.rows.email,
             };
 
             let token = util.createToken(tokenData);
 
             data = {
-                uid: user.rows[0].id,
-                email: user.rows[0].email,
-                nickName: user.rows[0].nickname,
-                firstLogin: user.rows[0].first_login,
+                uid: user.rows.id,
+                email: user.rows.email,
+                nickName: user.rows.nickname,
+                firstLogin: user.rows.first_login,
                 accessToken: token.access_token,
                 refreshToken: token.refresh_token,
             };
@@ -137,7 +154,7 @@ router.post("/login", async (req, res) => {
     }
 });
 
-router.post("/token", jwtVerify, async (req, res, next) => {
+router.post("/token", jwtVerify, async (req, res) => {
     try {
         let userInfo = req.userInfo;
 
@@ -171,6 +188,11 @@ router.post("/token", jwtVerify, async (req, res, next) => {
             return;
         }
 
+        if (tokenUpdate.affectedRows === 0) {
+            res.failResponse("AffectedEmpty");
+            return;
+        }
+
         let data = {
             accessToken: token.accessToken,
             refreshToken: token.refreshToken,
@@ -184,29 +206,29 @@ router.post("/token", jwtVerify, async (req, res, next) => {
     }
 });
 
-router.post("/logout", jwtVerify, async (req, res) => {
-    try {
-        let userInfo = req.userInfo;
+// router.post("/logout", jwtVerify, async (req, res) => {
+//     try {
+//         let userInfo = req.userInfo;
 
-        let result = await mysql.execute(`UPDATE ${schema}.user SET first_login = 0 WHERE id = ?;`, [userInfo.id]);
+//         let result = await mysql.execute(`UPDATE ${schema}.user SET first_login = 0 WHERE id = ?;`, [userInfo.id]);
 
-        if (!result.success) {
-            res.failResponse("QueryError");
-            return;
-        }
+//         if (!result.success) {
+//             res.failResponse("QueryError");
+//             return;
+//         }
 
-        if (result.affectedRows === 0) {
-            res.failResponse("QueryError");
-            return;
-        }
+//         if (result.affectedRows === 0) {
+//             res.failResponse("AffectedEmpty");
+//             return;
+//         }
 
-        res.successResponse();
-    } catch (exception) {
-        log.error(exception);
-        res.failResponse("ServerError");
-        return;
-    }
-});
+//         res.successResponse();
+//     } catch (exception) {
+//         log.error(exception);
+//         res.failResponse("ServerError");
+//         return;
+//     }
+// });
 
 router.delete("/secession", async (req, res) => {});
 
@@ -235,14 +257,14 @@ router.get("/profile", jwtVerify, async (req, res) => {
     }
 });
 
-const profileValidator = [body("nickName").notEmpty().isString().isLength({ min: 1, max: 45 })];
+const profileValidator = [body("nickName").notEmpty().isString().isLength({ min: 1, max: 45 }), validationHandler.handle];
 
 router.put("/profile", profileValidator, jwtVerify, async (req, res) => {
     try {
         let userInfo = req.userInfo;
-        let data = matchedData(data);
+        let reqData = matchedData(req);
 
-        let result = await mysql.execute(`UPDATE ${schema}.user SET nickname = ? WHERE id = ?;`, [data.nickName, userInfo.id]);
+        let result = await mysql.execute(`UPDATE ${schema}.user SET nickname = ? WHERE id = ?;`, [reqData.nickName, userInfo.id]);
 
         if (!result.success) {
             res.failResponse("QueryError");
@@ -250,7 +272,7 @@ router.put("/profile", profileValidator, jwtVerify, async (req, res) => {
         }
 
         if (result.affectedRows === 0) {
-            res.failResponse("QueryError");
+            res.failResponse("AffectedEmpty");
             return;
         }
 
@@ -282,7 +304,7 @@ router.get("/minime", jwtVerify, async (req, res) => {
     res.successResponse(dataTable);
 });
 
-const minimeValidator = [body("id").notEmpty().isInt()];
+const minimeValidator = [body("id").notEmpty().isInt(), validationHandler.handle];
 
 router.post("/minime", minimeValidator, jwtVerify, async (req, res) => {
     let reqData = matchedData(req);
@@ -308,7 +330,7 @@ router.post("/minime", minimeValidator, jwtVerify, async (req, res) => {
     }
 
     if (result.affectedRows === 0) {
-        res.failResponse("QueryError");
+        res.failResponse("AffectedEmpty");
         return;
     }
 

@@ -93,6 +93,14 @@ util.extractionToken = function (authorization) {
     }
 };
 
+util.countDay = function (date) {
+    let year = date.slice(0, 4);
+    let month = date.slice(5);
+
+    let result = new Date(year, month, 0).getDate();
+    return result;
+};
+
 JSON.emptyObject = JSON.stringify({});
 JSON.emptyArray = JSON.stringify([]);
 

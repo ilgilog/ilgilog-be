@@ -16,18 +16,19 @@ const schema = config.database.schema.COMMON;
 
 router.post("/login", async (req, res) => {
     try {
-        const code = req.query.code;
+        let code = req.headers.authorization;
 
-        const kakaoToken = await axios.post("https://kauth.kakao.com/oauth/token", null, {
+        code = code.split(" ")[1];
+
+        let kakaoToken = await axios.post("https://kauth.kakao.com/oauth/token", null, {
             params: {
                 grant_type: "authorization_code",
                 client_id: config.kakao.client_id,
-                redirect_url: config.kakao.redirect_url,
+                redirect_uri: config.kakao.redirect_uri,
                 code: code,
-                client_secret: config.kakao.client_secret,
             },
         });
-        const kakao_token = kakaoToken.data.access_token;
+        let kakao_token = kakaoToken.data.access_token;
 
         if (!kakao_token) {
             res.failResponse("ParameterInvalid");
@@ -36,13 +37,13 @@ router.post("/login", async (req, res) => {
 
         kakao_token = kakao_token.split(" ")[1];
 
-        const userData = await axios.get("https://kapi.kakao.com/v2/user/me", {
+        let userData = await axios.get("https://kapi.kakao.com/v2/user/me", {
             headers: {
                 Authorization: `Bearer ${kakao_token}`,
             },
         });
 
-        const userInfo = {
+        let userInfo = {
             email: userData.data.kakao_account.email,
             nickName: userData.data.kakao_account.profile.nickname,
         };

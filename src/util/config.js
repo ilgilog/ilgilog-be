@@ -42,7 +42,7 @@ const config = {
 
     kakao: {
         client_id: process.env.KAKAO_REST_API,
-        redirect_url: process.env.KAKAO_REDIRECT_URL,
+        redirect_uri: process.env.KAKAO_REDIRECT_URI,
         client_secret: process.env.KAKAO_CLIENT_SECRET,
     },
 };

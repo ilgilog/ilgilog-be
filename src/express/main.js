@@ -11,7 +11,6 @@ const { util, log, config } = require("../util");
 const errorCode = require("./errorCode");
 
 const userRouter = require("./router/user");
-const testRouter = require("./router/test");
 const mainRouter = require("./router/main");
 const homepyRouter = require("./router/homepy");
 
@@ -73,7 +72,6 @@ express.init = function () {
             webServer.use(require("request-ip").mw({ attributeName: "ipAddress" }));
 
             webServer.use("/api/user", userRouter);
-            webServer.use("/api/test", testRouter);
             webServer.use("/api/main", mainRouter);
             webServer.use("/api/homepy", homepyRouter);
 

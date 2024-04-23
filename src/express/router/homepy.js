@@ -188,8 +188,44 @@ router.post("/objet", objetPurchaseValidator, jwtVerify, async (req, res) => {
     res.successResponse();
 });
 
-router.get("/ranking", jwtVerify, async (req, res) => {});
+const rankingValidator = [query("type").notEmpty().isString().isIn(["like", "point"]), validationHandler.handle];
 
-router.put("/like", jwtVerify, async (req, res) => {});
+router.get("/ranking", rankingValidator, jwtVerify, async (req, res) => {
+    let reqData = matchedData(req);
+    let userInfo = req.userInfo;
+
+    if (reqData.type === "like") {
+    } else if (reqData.type === "point") {
+    }
+});
+
+const likeValidator = [body("id").notEmpty().isInt(), body("like").notEmpty().isInt(), validationHandler.handle];
+
+router.put("/like", likeValidator, jwtVerify, async (req, res) => {
+    let reqData = matchedData(req);
+    let userInfo = req.userInfo;
+
+    let verify = await mysql.query(`SELECT uid, lid, status FROM ${schema}.thumbs WHERE uid = ? AND lid = ?;`, [userInfo.id, reqData.id]);
+
+    if (!util.successValidator(verify, res)) {
+        return;
+    }
+
+    if (verify.rows.length === 0) {
+        let result = await mysql.execute(`INSERT INTO ${schema}.thumbs (uid, lid, status) VALUES (?, ?, ?);`, [userInfo.id, reqData.id, reqData.like]);
+
+        if (!util.successValidator(result, res)) {
+            return;
+        }
+    } else {
+        let result = await mysql.execute(`UPDATE ${schema}.thumbs SET status = ? WHERE uid = ? AND lid = ?;`, [reqData.like, userInfo.id, reqData.id]);
+
+        if (!util.successValidator(result, res)) {
+            return;
+        }
+    }
+
+    res.successResponse();
+});
 
 module.exports = router;

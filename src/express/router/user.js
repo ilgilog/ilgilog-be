@@ -28,14 +28,13 @@ router.post("/login", async (req, res) => {
                 code: code,
             },
         });
+
         let kakao_token = kakaoToken.data.access_token;
 
         if (!kakao_token) {
             res.failResponse("ParameterInvalid");
             return;
         }
-
-        kakao_token = kakao_token.split(" ")[1];
 
         let userData = await axios.get("https://kapi.kakao.com/v2/user/me", {
             headers: {
@@ -68,22 +67,24 @@ router.post("/login", async (req, res) => {
                 return;
             }
 
-            let newPoint = await mysql.execute(`INSERT INTO ${schema}.stat (uid, earned) VALUES (?, ?);`, [joinUser.insertId, 200]);
+            let selectID = await mysql.query(`SELECT id FROM ${schema}.user WHERE email = ?;`, [userInfo.email]);
 
-            if (!newPoint.success) {
+            if (!selectID.success) {
                 res.failResponse("QueryError");
                 return;
             }
 
             let tokenData = {
-                id: joinUser.insertId,
+                id: selectID.rows[0].id,
                 email: userInfo.email,
             };
 
             let token = util.createToken(tokenData);
+            console.log(tokenData);
+            console.log(token);
 
             let verificationQuery = `INSERT INTO ${schema}.verification (uid, token) VALUES (?, ?);`;
-            let verificationQueryParams = [joinUser.insertId, token.refresh_token];
+            let verificationQueryParams = [tokenData.id, token.refreshToken];
 
             let verificationUser = await mysql.execute(verificationQuery, verificationQueryParams);
 
@@ -91,31 +92,26 @@ router.post("/login", async (req, res) => {
                 res.failResponse("QueryError");
                 return;
             }
-
             data = {
-                uid: joinUser.insertId,
+                id: tokenData.id,
                 email: userInfo.email,
                 nickName: userInfo.nickName,
-                firstLogin: 0,
-                accessToken: token.access_token,
-                refreshToken: token.refresh_token,
+                firstLogin: 1,
+                access_token: token.accessToken,
+                refresh_token: token.refreshToken,
             };
+
+            res.successResponse(data);
         } else {
-            let user = await mysql.query(
-                `
-                SELECT id, email, nickname, first_login
-                FROM ${schema}.user
-                WHERE email = ?;`,
-                [userInfo.email],
-            );
+            let user = await mysql.query(`SELECT id, email, nickname, first_login FROM ${schema}.user WHERE email = ?;`, [userInfo.email]);
 
             if (!user.success) {
                 res.failResponse("QueryError");
                 return;
             }
 
-            if (user.rows.first_login === 1) {
-                let secondLogin = await mysql.execute(`UPDATE ${schema}.user SET first_login = 0 WHERE id = ?;`, [user.rows.id]);
+            if (user.rows[0].first_login === 1) {
+                let secondLogin = await mysql.execute(`UPDATE ${schema}.user SET first_login = 0 WHERE id = ?;`, [user.rows[0].id]);
 
                 if (!secondLogin.success) {
                     res.failResponse("QueryError");
@@ -129,23 +125,24 @@ router.post("/login", async (req, res) => {
             }
 
             let tokenData = {
-                id: user.rows.id,
-                email: user.rows.email,
+                id: user.rows[0].id,
+                email: user.rows[0].email,
             };
 
             let token = util.createToken(tokenData);
 
             data = {
-                uid: user.rows.id,
-                email: user.rows.email,
-                nickName: user.rows.nickname,
-                firstLogin: user.rows.first_login,
-                accessToken: token.access_token,
-                refreshToken: token.refresh_token,
+                id: user.rows[0].id,
+                email: user.rows[0].email,
+                nickName: user.rows[0].nickname,
+                // 개발 후 다시 0으로 변경
+                firstLogin: 1,
+                access_token: token.accessToken,
+                refresh_token: token.refreshToken,
             };
-        }
 
-        res.successResponse(data);
+            res.successResponse(data);
+        }
     } catch (exception) {
         log.error(exception);
         res.failResponse("ServerError");
@@ -229,7 +226,23 @@ router.post("/token", jwtVerify, async (req, res) => {
 //     }
 // });
 
-router.delete("/secession", async (req, res) => {});
+router.delete("/secession", jwtVerify, async (req, res) => {
+    try {
+        let userInfo = req.userInfo;
+
+        let result = await mysql.execute(`DELETE FROM ${schema}.user WHERE id = ? AND email = ?;`, [userInfo.id, userInfo.email]);
+
+        if (!util.successValidator(result, res)) {
+            return;
+        }
+
+        res.successResponse();
+    } catch (exception) {
+        log.error(exception);
+        res.failResponse("ServerError");
+        return;
+    }
+});
 
 router.get("/profile", jwtVerify, async (req, res) => {
     try {

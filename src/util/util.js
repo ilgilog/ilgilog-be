@@ -101,6 +101,24 @@ util.countDay = function (date) {
     return result;
 };
 
+util.successValidator = function (result, res) {
+    if (!result.success) {
+        res.failResponse("QueryError");
+        return false;
+    }
+
+    return true;
+};
+
+util.affectedValidator = function (result, res) {
+    if (result.affectedRows === 0) {
+        res.failResponse("AffectedEmpty");
+        return false;
+    }
+
+    return true;
+};
+
 JSON.emptyObject = JSON.stringify({});
 JSON.emptyArray = JSON.stringify([]);
 

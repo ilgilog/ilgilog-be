@@ -15,6 +15,11 @@ const config = {
     webServer: {
         host: process.env.WS_HOST,
         port: process.env.WS_PORT,
+
+        rateLimit: {
+            windowsMS: process.env.WS_RATE_LIMIT_WINDOWS_MS || 1 * 60 * 1000,
+            max: process.env.WS_RATE_LIMIT_MAX || 100,
+        },
     },
 
     database: {
@@ -38,6 +43,7 @@ const config = {
         accessExp: process.env.ACCESS,
         refreshExp: process.env.REFRESH,
         secret: process.env.SECRET,
+        timeInterval: process.env.TIME_INTERVAL,
     },
 
     kakao: {

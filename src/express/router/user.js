@@ -8,7 +8,7 @@ const express = require("express");
 const router = express.Router();
 const mysql = require("../../mysql/main");
 const { util, log, config } = require("../../util");
-const jwtVerify = require("../../util/verify");
+const { jwtVerify, refreshVerify } = require("../../util/verify");
 const { matchedData, validationResult, body, query } = require("express-validator");
 const validationHandler = require("../validationHandler");
 const axios = require("axios");
@@ -118,12 +118,25 @@ router.post("/login", async (req, res) => {
 
                 let token = util.createToken(tokenData);
 
+                let tokenVerify = await method.query(`SELECT uid FROM ${schema}.verification WHERE uid = ?;`, [user.rows[0].id]);
+
+                let verificationUser;
+
+                if (tokenVerify.rows.length === 0 || !tokenVerify.rows) {
+                    verificationUser = await method.execute(`INSERT INTO ${schema}.verification (uid, token) VALUES (?, ?);`, [user.rows[0].id, token.refreshToken]);
+                } else {
+                    verificationUser = await method.execute(`UPDATE ${schema}.verification SET token = ? WHERE uid = ?;`, [token.refreshToken, user.rows[0].id]);
+                }
+
+                if (!verificationUser.success) {
+                    return mysql.TRANSACTION.ROLLBACK;
+                }
+
                 data = {
                     id: user.rows[0].id,
                     email: user.rows[0].email,
                     nickName: user.rows[0].nickname,
-                    // 개발 후 다시 0으로 변경
-                    firstLogin: 1,
+                    firstLogin: 0,
                     access_token: token.accessToken,
                     refresh_token: token.refreshToken,
                 };
@@ -145,32 +158,34 @@ router.post("/login", async (req, res) => {
     }
 });
 
-router.post("/token", jwtVerify, async (req, res) => {
+router.post("/token", refreshVerify, async (req, res) => {
     try {
         let userInfo = req.userInfo;
 
         let re_token = util.extractionToken(req.headers.authorization);
 
-        let userQuery = `SELECT id, email FROM ${schema}.user WHERE id = ?;`;
-        userQuery += ` SELECT token FROM ${schema}.verification WHERE uid = ?;`;
+        let userVerify = await mysql.query(`SELECT id, email FROM ${schema}.user WHERE id = ?;`, [userInfo.id]);
 
-        let userQueryParmas = [userInfo.id, userInfo.id];
-
-        let user = await mysql.query(userQuery, userQueryParmas);
-
-        if (!user.success) {
+        if (!userVerify.success) {
             res.failResponse("QueryError");
             return;
         }
 
-        if (user.rows[1].token !== re_token) {
+        let tokenVerify = await mysql.query(`SELECT token FROM ${schema}.verification WHERE uid = ?;`, [userInfo.id]);
+
+        if (!tokenVerify.success) {
+            res.failResponse("QueryError");
+            return;
+        }
+
+        if (tokenVerify.rows[0].token !== re_token || tokenVerify.rows.length === 0) {
             res.failResponse("AuthorizationInvalid");
             return;
         }
 
         let token = util.createToken(userInfo);
 
-        let tokenUpdate = await mysql.execute(`UPDATE ${schema}.verification SET token = ? WHERE uid = ?;`, [token.refreshToken, userInfo.id]);
+        let tokenUpdate = await mysql.execute(`UPDATE ${schema}.verification SET token = ?, exp_date = DATE_ADD(NOW(), INTERVAL ${config.jwt.timeInterval}) WHERE uid = ?;`, [token.refreshToken, userInfo.id]);
 
         if (!tokenUpdate.success) {
             res.failResponse("QueryError");
@@ -245,8 +260,10 @@ router.delete("/secession", jwtVerify, async (req, res) => {
 
         if (result.commit) {
             res.successResponse();
+            return;
         } else {
             res.failResponse("TransactionError");
+            return;
         }
     } catch (exception) {
         log.error(exception);

@@ -8,7 +8,7 @@ const express = require("express");
 const router = express.Router();
 const mysql = require("../../mysql/main");
 const { util, log, config } = require("../../util");
-const jwtVerify = require("../../util/verify");
+const { jwtVerify } = require("../../util/verify");
 const { matchedData, validationResult, body, query } = require("express-validator");
 const validationHandler = require("../validationHandler");
 const schema = config.database.schema.COMMON;
@@ -177,7 +177,12 @@ router.get("/point", jwtVerify, async (req, res) => {
             res.failResponse("QueryError");
         }
 
-        res.successResponse(result.rows);
+        let data = {};
+
+        data.uid = result.rows[0].uid;
+        data.point = result.rows[0].point;
+
+        res.successResponse(data);
     } catch (exception) {
         log.error(exception);
         res.failResponse("ServerError");
@@ -192,8 +197,6 @@ router.get("/calendar", calendarValidator, jwtVerify, async (req, res) => {
         let reqData = matchedData(req);
         let userInfo = req.userInfo;
 
-        let days = util.countDay(reqData.date);
-
         let result = await mysql.query(`SELECT DATE_FORMAT(date, '%Y-%m-%d') AS date FROM ${schema}.diary WHERE uid = ? AND date LIKE ?;`, [userInfo.id, `${reqData.date}%`]);
 
         if (!result.success) {
@@ -206,26 +209,10 @@ router.get("/calendar", calendarValidator, jwtVerify, async (req, res) => {
             return;
         }
 
-        let writeDays = [];
-
-        for (let row of result.rows) {
-            writeDays.push(row.date);
-        }
-
         let dataTable = [];
 
-        for (let i = 1; i <= days; i++) {
-            let obj = new Object();
-            let date = "";
-            if (i < 10) {
-                date = reqData.date + `-0${i}`;
-            } else {
-                date = reqData.date + `-${i}`;
-            }
-
-            obj.date = date;
-            obj.write = writeDays.includes(date) ? 1 : 0;
-            dataTable.push(obj);
+        for (let row of result.rows) {
+            dataTable.push(row.date);
         }
 
         res.successResponse(dataTable);

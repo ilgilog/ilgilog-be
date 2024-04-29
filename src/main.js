@@ -8,6 +8,7 @@
 const moment = require("moment-timezone");
 const SERVICE_INIT_WAIT = 30;
 
+
 // ? process.send 함수가 없을 경우 고려 (https://stackoverflow.com/questions/30585540/process-send-is-conditionally-defined-in-node-js)
 process.send = process.send || function () {};
 

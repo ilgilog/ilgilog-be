@@ -7,6 +7,7 @@
 const errorCode = [];
 
 errorCode.errors = {
+    TooManyRequest: { code: 1000, message: "Too many request" },
     ParameterInvalid: { code: 1001, message: "Parameter invalid" },
     TimestampInvalid: { code: 1002, message: "Timestamp invalid" },
     AuthorizationNull: { code: 1003, message: "Authorization null" },
@@ -17,6 +18,7 @@ errorCode.errors = {
     NotPurchaseObjet: { code: 1008, message: "Not purchase objet" },
     AlreadyPurchase: { code: 1009, message: "Already purchase " },
     AlreadyActivation: { code: 1010, message: "Already activation" },
+    NotEnoughPoint: { code: 1011, message: "Not enough point" },
 
     NotFound: { code: 2000, message: "Not found" },
     ServerError: { code: 2001, message: "Server error" },

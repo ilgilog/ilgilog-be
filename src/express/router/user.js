@@ -151,6 +151,7 @@ router.post("/login", async (req, res) => {
         }
 
         res.successResponse(data);
+        return;
     } catch (exception) {
         log.error(exception);
         res.failResponse("ServerError");
@@ -328,7 +329,7 @@ router.get("/minime", jwtVerify, async (req, res) => {
     try {
         let dataTable = [];
 
-        let result = await mysql.query(`SELECT id, url FROM ${schema}.minime WHERE type = 1;`);
+        let result = await mysql.query(`SELECT id, url FROM ${schema}.minime WHERE type = 0;`);
 
         if (!result.success) {
             res.failResponse("QueryError");
@@ -378,6 +379,84 @@ router.post("/minime", minimeValidator, jwtVerify, async (req, res) => {
 
         res.successResponse();
     } catch (exception) {
+        log.error(exception);
+        res.failResponse("ServerError");
+        return;
+    }
+});
+
+router.get("/list", jwtVerify, async (req, res) => {
+    try {
+        let userInfo = req.userInfo;
+
+        let result = await mysql.query(`SELECT oid, o_name, price, DATE_FORMAT(reg_date, '%Y-%m-%d') AS date FROM ${schema}.history WHERE uid = ?;`, [userInfo.id]);
+
+        if (!result.success) {
+            res.failResponse("QueryError");
+            return;
+        }
+
+        res.successResponse(result.rows);
+    } catch (exception) {
+        log.error(exception);
+        res.failResponse("ServerError");
+        return;
+    }
+});
+
+router.get("/xp", jwtVerify, async (req, res) => {
+    try {
+        let userInfo = req.userInfo;
+
+        let result = await mysql.query(`SELECT xp FROM ${schema}.stat WHERE uid = ?;`, [userInfo.id]);
+
+        if (!result.success) {
+            res.failResponse("QueryError");
+            return;
+        }
+
+        let data = {};
+        data.xp = result.rows[0].xp;
+
+        res.successResponse(data);
+    } catch (exception) {
+        log.error(exception);
+        res.failResponse("ServerError");
+        return;
+    }
+});
+
+const xpValidator = [body("step").notEmpty().isInt().isIn([1, 2, 3]), validationHandler.handle];
+
+router.post("/xp", xpValidator, jwtVerify, async (req, res) => {
+    try {
+        let reqData = matchedData(req);
+        let userInfo = req.userInfo;
+
+        let minimeId = await mysql.query(`SELECT mid FROM ${schema}.user WHERE id = ?;`, [userInfo.id]);
+
+        if (!minimeId.success) {
+            res.failResponse("QueryError");
+            return;
+        }
+
+        let mid = Number(minimeId.rows[0].mid.toString().substring(0, 1) + reqData.step);
+
+        let result = await mysql.execute(`UPDATE ${schema}.user SET mid = ? WHERE id = ?;`, [mid, userInfo.id]);
+
+        if (!result.success) {
+            res.failResponse("QueryError");
+            return;
+        }
+
+        if (result.affectedRows === 0) {
+            res.failResponse("AffectedEmpty");
+            return;
+        }
+
+        res.successResponse();
+    } catch (exception) {
+        console.log(exception);
         log.error(exception);
         res.failResponse("ServerError");
         return;

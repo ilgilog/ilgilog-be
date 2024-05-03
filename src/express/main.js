@@ -9,10 +9,12 @@ const express = { _server: null, _init: false };
 const engine = require("express");
 const { util, log, config } = require("../util");
 const errorCode = require("./errorCode");
+const cors = require("cors");
 
 const userRouter = require("./router/user");
 const mainRouter = require("./router/main");
 const homepyRouter = require("./router/homepy");
+const noticeRouter = require("./router/notice");
 
 express.init = function () {
     return new Promise(async (resolve, reject) => {
@@ -24,6 +26,13 @@ express.init = function () {
             webServer.set("trust proxy", 1);
             webServer.use(require("helmet")());
             webServer.use(require("compression")());
+
+            webServer.use(
+                cors({
+                    origin: config.webServer.cors.allowOrigin,
+                    credentials: true,
+                }),
+            );
 
             webServer.use(engine.json({ strict: false }));
             webServer.use(engine.urlencoded({ extended: true }));
@@ -74,6 +83,7 @@ express.init = function () {
             webServer.use("/api/user", userRouter);
             webServer.use("/api/main", mainRouter);
             webServer.use("/api/homepy", homepyRouter);
+            webServer.use("/api/notice", noticeRouter);
 
             let routers = engine.Router();
 

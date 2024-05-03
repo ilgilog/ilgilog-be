@@ -20,6 +20,10 @@ const config = {
             windowsMS: process.env.WS_RATE_LIMIT_WINDOWS_MS || 1 * 60 * 1000,
             max: process.env.WS_RATE_LIMIT_MAX || 100,
         },
+
+        cors: {
+            allowOrigin: process.env.WS_CORS_ALLOW_ORIGIN,
+        },
     },
 
     database: {

@@ -23,7 +23,7 @@ router.get("/diary", selectDiaryValidator, jwtVerify, async (req, res) => {
         let result = await mysql.query(
             `
             SELECT id, uid, title, weather, mood, description, DATE_FORMAT(date, '%Y-%m-%d') AS date 
-            FROM ilgilog.diary WHERE uid = ? AND date = ?;
+            FROM ${schema}.diary WHERE uid = ? AND date = ?;
             `,
             [userInfo.id, reqData.date],
         );

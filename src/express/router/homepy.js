@@ -14,14 +14,39 @@ const validationHandler = require("../validationHandler");
 const { jwt } = require("../../util/config");
 const schema = config.database.schema.COMMON;
 
-router.get("/", jwtVerify, async (req, res) => {
+const homepyValidator = [query("id").optional().isInt(), validationHandler.handle];
+
+router.get("/", homepyValidator, jwtVerify, async (req, res) => {
     try {
+        let reqData = matchedData(req);
         let userInfo = req.userInfo;
         let data = {};
 
-        data.id = userInfo.id;
+        if (reqData.id) {
+            data.id = Number(reqData.id);
 
-        let minime = await mysql.query(`SELECT user.mid AS id, minime.url AS url FROM ${schema}.user LEFT JOIN ${schema}.minime ON user.mid = minime.id WHERE user.id = ?;`, [userInfo.id]);
+            let thumbs = await mysql.query(`SELECT SUM(CASE WHEN status = 1 THEN 1 ELSE 0 END) AS count FROM thumbs WHERE lid = ?;`, [data.id]);
+            let point = await mysql.query(`SELECT used FROM ${schema}.stat WHERE uid = ?;`, [data.id]);
+            let status = await mysql.query(`SELECT status FROM ${schema}.thumbs WHERE uid = ? AND lid = ?;`, [userInfo.id, data.id]);
+
+            if (!thumbs.success || !point.success || !status.success) {
+                res.failResponse("QueryError");
+                return;
+            }
+
+            data.like = Number(thumbs.rows[0].count);
+            data.point = point.rows[0].used;
+
+            if (status.rows.length === 0) {
+                data.status = 0;
+            } else {
+                data.status = status.rows[0].status;
+            }
+        } else {
+            data.id = userInfo.id;
+        }
+
+        let minime = await mysql.query(`SELECT user.mid AS id, minime.url AS url FROM ${schema}.user LEFT JOIN ${schema}.minime ON user.mid = minime.id WHERE user.id = ?;`, [data.id]);
 
         if (!minime.success) {
             res.failResponse("QueryError");
@@ -33,12 +58,12 @@ router.get("/", jwtVerify, async (req, res) => {
         let objet = await mysql.query(
             `
         SELECT home.oid AS id, objet.name AS name, objet.position AS position, objet.price AS price, objet.url AS url, store.status AS status
-        FROM ilgilog.home
-        LEFT JOIN ilgilog.objet ON home.oid = objet.id
-        LEFT JOIN ilgilog.store ON home.uid = store.uid AND home.oid = store.oid
+        FROM ${schema}.home
+        LEFT JOIN ${schema}.objet ON home.oid = objet.id
+        LEFT JOIN ${schema}.store ON home.uid = store.uid AND home.oid = store.oid
         WHERE home.uid = ?;        
         `,
-            [userInfo.id],
+            [data.id],
         );
 
         if (!objet.success) {
@@ -131,8 +156,8 @@ router.put("/objet/apply", objetActiveValidator, jwtVerify, async (req, res) => 
 
         let purchaseVerify = await mysql.query(
             `
-            SELECT s.purchase, s.status, o.position 
-            FROM ${schema}.store AS s LEFT JOIN ${schema}.objet AS o ON s.oid = o.id 
+            SELECT s.purchase, s.status, o.position
+            FROM ${schema}.store AS s LEFT JOIN ${schema}.objet AS o ON s.oid = o.id
             WHERE uid = ? AND oid = ?;
             `,
             [userInfo.id, reqData.id],
@@ -185,6 +210,7 @@ router.put("/objet/apply", objetActiveValidator, jwtVerify, async (req, res) => 
 
         if (result.commit) {
             res.successResponse();
+            return;
         } else {
             res.failResponse("TransactionError");
             return;
@@ -195,95 +221,6 @@ router.put("/objet/apply", objetActiveValidator, jwtVerify, async (req, res) => 
         return;
     }
 });
-
-// const objetActiveValidator = [body("id").notEmpty().isInt(), validationHandler.handle];
-
-// router.put("/objet/apply", objetActiveValidator, jwtVerify, async (req, res) => {
-//     try {
-//         let reqData = matchedData(req);
-//         let userInfo = req.userInfo;
-
-//         let verify = await mysql.query(
-//             `
-//             SELECT s.purchase, s.status, o.position
-//             FROM ${schema}.store AS s LEFT JOIN ${schema}.objet AS o ON s.oid = o.id
-//             WHERE uid = ? AND oid = ?;
-//             `,
-//             [userInfo.id, reqData.id],
-//         );
-
-//         if (!verify.success) {
-//             res.failResponse("QueryError");
-//             return;
-//         }
-
-//         if (verify.rows.length === 0 || verify.rows[0].purchase === 0) {
-//             res.failResponse("NotPurchaseObjet");
-//             return;
-//         }
-
-//         if (verify.rows[0].status === 1) {
-//             res.failResponse("AlreadyActivation");
-//             return;
-//         }
-
-//         let result = await mysql.transactionStatement(async (method) => {
-//             let applyVerify = await method.query(
-//                 `
-//                 SELECT id, status FROM ${schema}.store WHERE uid = ? AND oid IN (
-//                     SELECT id FROM objet WHERE position = ? AND id <> ?);
-//                 `,
-//                 [userInfo.id, verify.rows[0].position, reqData.id],
-//             );
-
-//             if (!applyVerify.success || applyVerify.rows.length === 0) {
-//                 return mysql.TRANSACTION.ROLLBACK;
-//             }
-
-//             let statusFlag = 0;
-
-//             for (let row of applyVerify.rows) {
-//                 if (row.status === 0) {
-//                     continue;
-//                 } else {
-//                     let release = await method.execute(`UPDATE ${schema}.store SET status = 0 WHERE id = ?;`, [row.id]);
-
-//                     if (!release.success || release.affectedRows === 0) {
-//                         return mysql.TRANSACTION.ROLLBACK;
-//                     }
-//                 }
-
-//                 statusFlag = 1;
-//             }
-
-//             if (statusFlag) {
-//                 let apply = await method.execute(`UPDATE ${schema}.store SET status = 1 WHERE uid =? AND oid = ?;`, [userInfo.id, reqData.id]);
-
-//                 if (!apply.success || apply.affectedRows === 0) {
-//                     return mysql.TRANSACTION.ROLLBACK;
-//                 }
-//             }
-
-//             return mysql.TRANSACTION.COMMIT;
-//         });
-
-//         if (!result.success) {
-//             res.failResponse("QueryError");
-//             return;
-//         }
-
-//         if (result.commit) {
-//             res.successResponse();
-//         } else {
-//             res.failResponse("TransactionError");
-//             return;
-//         }
-//     } catch (exception) {
-//         log.error(exception);
-//         res.failResponse("ServerError");
-//         return;
-//     }
-// });
 
 const objetReleaseValidator = [body("id").notEmpty().isInt(), validationHandler.handle];
 
@@ -426,11 +363,127 @@ router.post("/objet", objetPurchaseValidator, jwtVerify, async (req, res) => {
 const rankingValidator = [query("type").notEmpty().isString().isIn(["like", "point"]), validationHandler.handle];
 
 router.get("/ranking", rankingValidator, jwtVerify, async (req, res) => {
-    let reqData = matchedData(req);
-    let userInfo = req.userInfo;
+    try {
+        let reqData = matchedData(req);
+        let userInfo = req.userInfo;
 
-    if (reqData.type === "like") {
-    } else if (reqData.type === "point") {
+        let dataTable = [];
+
+        if (reqData.type === "like") {
+            let likeRank = await mysql.query(
+                `
+                SELECT id AS uid, nickname, score AS count
+                FROM ${schema}.user
+                WHERE active = 1
+                ORDER BY score DESC;
+                `,
+            );
+
+            if (!likeRank.success) {
+                res.failResponse("QueryError");
+                return;
+            }
+
+            if (likeRank.rows.length === 0) {
+                res.failResponse("EmptyActiveUser");
+            }
+
+            let lidData = await mysql.query(`SELECT lid FROM ${schema}.thumbs WHERE uid = ? AND status = 1;`, [userInfo.id]);
+
+            if (!lidData.success) {
+                res.failResponse("QueryError");
+                return;
+            }
+
+            let lid = lidData.rows.map((item) => item.lid);
+
+            for (let i = 0; i < likeRank.rows.length; i++) {
+                let data = {};
+
+                data.uid = likeRank.rows[i].uid;
+                data.nickName = likeRank.rows[i].nickname;
+                data.like = Number(likeRank.rows[i].count);
+
+                if (lid.includes(likeRank.rows[i].uid)) {
+                    data.likeStatus = 1;
+                } else {
+                    data.likeStatus = 0;
+                }
+
+                if (i < 3) {
+                    let minimeData = await mysql.query(`SELECT user.mid AS id, minime.url AS url FROM ${schema}.user LEFT JOIN ${schema}.minime ON user.mid = minime.id WHERE user.id = ?;`, [likeRank.rows[i].uid]);
+                    let objetData = await mysql.query(
+                        `
+                        SELECT home.oid AS id, objet.name AS name, objet.position AS position, objet.price AS price, objet.url AS url, store.status AS status
+                        FROM ${schema}.home
+                        LEFT JOIN ${schema}.objet ON home.oid = objet.id
+                        LEFT JOIN ${schema}.store ON home.uid = store.uid AND home.oid = store.oid
+                        WHERE home.uid = ?; 
+                        `,
+                        [likeRank.rows[i].uid],
+                    );
+
+                    if (!minimeData.success || !objetData.success) {
+                        throw new Error("QueryError");
+                    }
+                    data.minime = minimeData.rows[0];
+                    data.objet = objetData.rows;
+                }
+
+                dataTable.push(data);
+            }
+        } else if (reqData.type === "point") {
+            let pointRank = await mysql.query(
+                `
+                SELECT u.id AS uid, u.nickname AS nickname, s.used AS point, RANK() OVER (ORDER BY s.used DESC) AS ranking
+                FROM ${schema}.stat s LEFT JOIN ${schema}.user AS u ON s.uid = u.id
+                WHERE u.active = 1
+                ORDER BY ranking ASC;
+                `,
+            );
+
+            if (!pointRank.success) {
+                res.failResponse("QueryError");
+                return;
+            }
+
+            for (let i = 0; i < pointRank.rows.length; i++) {
+                let data = {};
+
+                data.uid = pointRank.rows[i].uid;
+                data.nickName = pointRank.rows[i].nickname;
+                data.point = pointRank.rows[i].point;
+
+                if (i < 3) {
+                    let minimeData = await mysql.query(`SELECT user.mid AS id, minime.url AS url FROM ${schema}.user LEFT JOIN ${schema}.minime ON user.mid = minime.id WHERE user.id = ?;`, [pointRank.rows[i].uid]);
+                    let objetData = await mysql.query(
+                        `
+                        SELECT home.oid AS id, objet.name AS name, objet.position AS position, objet.price AS price, objet.url AS url, store.status AS status
+                        FROM ${schema}.home
+                        LEFT JOIN ${schema}.objet ON home.oid = objet.id
+                        LEFT JOIN ${schema}.store ON home.uid = store.uid AND home.oid = store.oid
+                        WHERE home.uid = ?; 
+                        `,
+                        [pointRank.rows[i].uid],
+                    );
+
+                    if (!minimeData.success || !objetData.success) {
+                        throw new Error("QueryError");
+                    }
+                    data.minime = minimeData.rows[0];
+                    data.objet = objetData.rows;
+                }
+
+                dataTable.push(data);
+            }
+        }
+
+        res.successResponse(dataTable);
+    } catch (exception) {
+        console.log(exception);
+        log.error(exception);
+        res.failResponse("ServerError");
+        return;
     }
 });
 
@@ -441,35 +494,66 @@ router.put("/like", likeValidator, jwtVerify, async (req, res) => {
         let reqData = matchedData(req);
         let userInfo = req.userInfo;
 
+        let idVerify = await mysql.query(`SELECT id, score FROM ${schema}.user WHERE id = ?;`, [reqData.id]);
+
+        if (!idVerify.success) {
+            res.failResponse("QueryError");
+            return;
+        }
+
+        if (idVerify.rows.length === 0) {
+            res.failResponse("ParameterInvalid");
+            return;
+        }
+
         let verify = await mysql.query(`SELECT uid, lid, status FROM ${schema}.thumbs WHERE uid = ? AND lid = ?;`, [userInfo.id, reqData.id]);
 
         if (!verify.success) {
             res.failResponse("QueryError");
             return;
         }
+        let result = await mysql.transactionStatement(async (method) => {
+            if (verify.rows.length === 0) {
+                let result = await method.execute(`INSERT INTO ${schema}.thumbs (uid, lid, status) VALUES (?, ?, ?);`, [userInfo.id, reqData.id, reqData.like]);
 
-        if (verify.rows.length === 0) {
-            let result = await mysql.execute(`INSERT INTO ${schema}.thumbs (uid, lid, status) VALUES (?, ?, ?);`, [userInfo.id, reqData.id, reqData.like]);
+                if (!result.success) {
+                    return mysql.TRANSACTION.ROLLBACK;
+                }
+            } else {
+                let result = await method.execute(`UPDATE ${schema}.thumbs SET status = ? WHERE uid = ? AND lid = ?;`, [reqData.like, userInfo.id, reqData.id]);
 
-            if (!result.success) {
-                res.failResponse("QueryError");
-                return;
+                if (!result.success || result.affectedRows === 0) {
+                    return mysql.TRANSACTION.ROLLBACK;
+                }
             }
-        } else {
-            let result = await mysql.execute(`UPDATE ${schema}.thumbs SET status = ? WHERE uid = ? AND lid = ?;`, [reqData.like, userInfo.id, reqData.id]);
-
-            if (!result.success) {
-                res.failResponse("QueryError");
-                return;
+            let scoreUpdate;
+            if (reqData.like === 0) {
+                if (idVerify.rows[0].score > 0) {
+                    scoreUpdate = await method.execute(`UPDATE ${schema}.user SET score = score - 1 WHERE id = ?;`, [reqData.id]);
+                }
+            } else {
+                scoreUpdate = await method.execute(`UPDATE ${schema}.user SET score = score + 1 WHERE id = ?;`, [reqData.id]);
             }
 
-            if (result.affectedRows === 0) {
-                res.failResponse("AffectedEmpty");
-                return;
+            if (!scoreUpdate.success || scoreUpdate.affectedRows === 0) {
+                return mysql.TRANSACTION.ROLLBACK;
             }
+
+            return mysql.TRANSACTION.COMMIT;
+        });
+
+        if (!result.success) {
+            res.failResponse("QueryError");
+            return;
         }
 
-        res.successResponse();
+        if (result.commit) {
+            res.successResponse();
+            return;
+        } else {
+            res.failResponse("TransactionError");
+            return;
+        }
     } catch (exception) {
         log.error(exception);
         res.failResponse("ServerError");

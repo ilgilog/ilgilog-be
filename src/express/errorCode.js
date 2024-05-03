@@ -19,6 +19,9 @@ errorCode.errors = {
     AlreadyPurchase: { code: 1009, message: "Already purchase " },
     AlreadyActivation: { code: 1010, message: "Already activation" },
     NotEnoughPoint: { code: 1011, message: "Not enough point" },
+    NoticeEmpty: { code: 1012, message: "Notice empty" },
+    NotExistNotice: { code: 1013, message: "Not exist notice" },
+    EmptyActiveUser: { code: 1014, message: "Empty active user" },
 
     NotFound: { code: 2000, message: "Not found" },
     ServerError: { code: 2001, message: "Server error" },

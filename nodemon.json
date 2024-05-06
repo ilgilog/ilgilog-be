@@ -1,0 +1,4 @@
+{
+    "ignore": [".git", "node_modules", "maintenanace"],
+    "ext": "js,json"
+}

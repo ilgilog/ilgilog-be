@@ -42,6 +42,7 @@ BEGIN
 END$$
 DELIMITER ;
 
+<<<<<<< HEAD
 
 DELIMITER //
 CREATE TRIGGER minime_evolution AFTER UPDATE ON ilgilog.stat
@@ -56,3 +57,6 @@ DELIMITER ;
 
 SHOW TRIGGERS;
 
+=======
+SHOW TRIGGERS;
+>>>>>>> 5564b834f2b6a3173e44e462688b2186c4aad8c3

@@ -42,4 +42,17 @@ BEGIN
 END$$
 DELIMITER ;
 
+
+DELIMITER //
+CREATE TRIGGER minime_evolution AFTER UPDATE ON ilgilog.stat
+FOR EACH ROW
+BEGIN
+    IF NEW.xp IN (7, 40, 100) THEN
+        UPDATE ilgilog.user SET mid = mid + 1 WHERE id = NEW.uid;
+    END IF;
+END;
+//
+DELIMITER ;
+
 SHOW TRIGGERS;
+
